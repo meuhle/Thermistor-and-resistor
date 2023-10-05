@@ -20,10 +20,10 @@ TaskHandle_t Task2;  //check user input so button and BLE and also print to OLED
 #define ONE_WIRE_BUS_D 27  // Pin Arduino a cui colleghiamo il pin DQ del sensore
 #define Rel_U 32           //pin for relay of upper plate
 #define Rel_D 33           //pin for relay of upper plate
-const int plus_U = 17;     //pin for btn of upper plate
-const int minus_U = 16;    //pin for btn of upper plate
-const int plus_D = 25;     //pin for btn of lower plate
-const int minus_D = 18;    //pin for btn of lower plate
+const int plus_U = 16;     //pin for btn of upper plate
+const int minus_U = 17;    //pin for btn of upper plate
+const int plus_D = 18;     //pin for btn of lower plate
+const int minus_D = 25;    //pin for btn of lower plate
 
 // define the 2 thermistor
 OneWire oneWire_U(ONE_WIRE_BUS_U);        // Imposta la connessione OneWire
@@ -64,10 +64,10 @@ void setup() {
   u8g2_prepare();
   pinMode(Rel_D, OUTPUT);
   pinMode(Rel_U, OUTPUT);
-  pinMode(plus_D, INPUT);
-  pinMode(plus_U, INPUT);
-  pinMode(minus_D, INPUT);
-  pinMode(minus_U, INPUT);
+  pinMode(plus_D, INPUT_PULLUP);
+  pinMode(plus_U, INPUT_PULLUP);
+  pinMode(minus_D, INPUT_PULLUP);
+  pinMode(minus_U, INPUT_PULLUP);
   //pinMode(LED_BUILTIN, OUTPUT); // initialize the built-in LED pin to indicate when a central is connected
   sensore_U.begin();
   sensore_D.begin();
@@ -183,15 +183,19 @@ void TaskHandler(void* pvParameters) {
 
 void TaskTemp(void* pvParameters) {
   while (1) {
-    Serial.println("Temp Task");
+    //Serial.println("Temp Task");
     if (TU > RU) {
+      Serial.println("UP HIGH");
       digitalWrite(Rel_U, HIGH);
     } else {
+      Serial.println("UP LOW");
       digitalWrite(Rel_U, LOW);
     }
     if (TD > RD) {
+      Serial.println("DOWN HIGH");
       digitalWrite(Rel_D, HIGH);
     } else {
+      Serial.println("DOWN LOW");
       digitalWrite(Rel_D, LOW);
     }
     vTaskDelay(100);
