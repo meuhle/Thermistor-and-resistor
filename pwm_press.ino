@@ -12,6 +12,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 //#include <NanoBLEFlashPrefs.h>
+#include "hal/ledc_types.h"
+#include <Arduino.h>
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 void TaskHandler(void* pvParameters);
@@ -28,7 +30,7 @@ const int minus_U = 17;    //pin for btn of upper plate
 const int plus_D = 18;     //pin for btn of lower plate
 const int minus_D = 19;    //pin for btn of lower plate
 
-const int up_pwm = 5;  // pin for upper pwm
+const int up_pwm = 22;  // pin for upper pwm
 const int down_pwm = 23;  // pin for lower pwm
 
 // define the 2 thermistor
@@ -49,8 +51,8 @@ int pwm_UP = 0;
 int pwm_DOWN = 0;
 // setting PWM properties
 const int freq = 50;
-const int up_pwm_channel = 1;  //channel for upper plate, use differnt channel because goes to different freq related to read temp
-const int down_pwm_channel = 2;
+const int up_pwm_channel = 0;  //channel for upper plate, use differnt channel because goes to different freq related to read temp
+const int down_pwm_channel = 1;
 const int resolution = 8;
 const int MAX_DUTY_CYCLE = (int)(pow(2, resolution) - 1);
 
@@ -66,12 +68,25 @@ void setup() {
   Serial.begin(115200);
   //create pwm channel and set to pin
   /*ledcSetup(up_pwm_channel, freq, resolution);
-  ledcSetup(down_pwm_channel, freq, resolution);
   ledcAttachPin(up_pwm, up_pwm_channel);
-  ledcAttachPin(down_pwm, down_pwm_channel);*/
-  ledcAttach(up_pwm, freq, resolution);
+  ledcWrite(up_pwm, 255);*/
+  bool p1 = ledcAttachChannel(up_pwm, freq, resolution,up_pwm_channel);
+  Serial.print("PWM1 attach channel is ");
+  if (p1){
+    Serial.println("true ");
+    ledcWrite(up_pwm, 0);
+  }else{
+    Serial.println("false");
+  }
+  //pinMode(up_pwm, OUTPUT);
+  
+  /*ledcSetup(down_pwm_channel, freq, resolution);  
+  ledcAttachPin(down_pwm, down_pwm_channel);  
   ledcAttach(down_pwm, freq, resolution);
-  //begin screen
+  
+  analogWrite(up_pwm, 255);
+  pinMode(down_pwm, OUTPUT);*/
+    //begin screen
   /*u8g2.begin();
   u8g2_prepare();*/
   pinMode(plus_D, INPUT_PULLUP);
@@ -126,8 +141,7 @@ void TaskHandler(void* pvParameters) {
     sensore_D.requestTemperatures();
     RU = sensore_U.getTempCByIndex(0);
     RD = sensore_D.getTempCByIndex(0);
-    Serial.println("task1");
-Serial.println(RU);
+    
     p_U = digitalRead(plus_U);
     if (p_U == HIGH) {
       TU = TU + 1;
@@ -167,7 +181,7 @@ void TaskTemp(void* pvParameters) {
     Serial.print("Task2");
     Serial.println(RU);
     if (RU < (int)(cutout * TU)) {
-      ledcWrite(up_pwm, 255);
+      bool x = ledcWrite(up_pwm, 255);
     } else {
       pwm_UP = (int)map(RU, 0, TU, 255, 0  );
       ledcWrite(up_pwm, pwm_UP);
