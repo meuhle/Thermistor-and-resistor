@@ -183,13 +183,13 @@ void TaskTemp(void* pvParameters) {
     if (RU < (int)(cutout * TU)) {
       bool x = ledcWrite(up_pwm, 255);
     } else {
-      pwm_UP = (int)map(RU, 0, TU, 255, 0  );
+      pwm_UP = (int)map(RU, 0, TU, 255, 20  );
       ledcWrite(up_pwm, pwm_UP);
     }
     if (RD < (int)(cutout * TD)) {
       ledcWrite(down_pwm, 255);
     } else {
-      pwm_DOWN = (int)map(RD, 0, TD, 255, 0  );
+      pwm_DOWN = (int)map(RD, 0, TD, 255, 20  );
       ledcWrite(down_pwm, pwm_DOWN);
     }
 
