@@ -4,6 +4,44 @@
     220V Home is at 50Hz
     resolution = 8
 */
+//ALL Elegant OTA Part
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <ElegantOTA.h>
+
+const char *ssid = "PRESS";
+const char *password = "PR355_P455W0RD";
+
+WebServer server(80);
+
+unsigned long ota_progress_millis = 0;
+
+void onOTAStart() {
+  // Log when OTA has started
+  Serial.println("OTA update started!");
+  // <Add your own code here>
+}
+
+void onOTAProgress(size_t current, size_t final) {
+  // Log every 1 second
+  if (millis() - ota_progress_millis > 1000) {
+    ota_progress_millis = millis();
+    Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
+  }
+}
+
+void onOTAEnd(bool success) {
+  // Log when OTA has finished
+  if (success) {
+    Serial.println("OTA update finished successfully!");
+  } else {
+    Serial.println("There was an error during OTA update!");
+  }
+  // <Add your own code here>
+}
+//-----------------------------------------------------------
+
 #define SEC 1000
 #define SCREEN_WIDTH 128  // OLED display width, in pixels
 #define SCREEN_HEIGHT 64  // OLED display height, in pixels
@@ -11,6 +49,8 @@
 #include <Wire.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+
+
 //#include <NanoBLEFlashPrefs.h>
 #include "hal/ledc_types.h"
 #include <Arduino.h>
@@ -66,17 +106,53 @@ void u8g2_prepare() {  //prepare the screen
 
 void setup() {
   Serial.begin(115200);
+IPAddress myIP = WiFi.softAP(ssid, password);
+  if (!myIP) {
+    log_e("Soft AP creation failed.");
+    while (1);
+  }else{
+    Serial.println(myIP);
+  }
+  server.begin();
+   server.on("/", []() {
+    server.send(200, "text/plain", "Hi! This is ElegantOTA Demo.");
+  });
+
+  ElegantOTA.begin(&server);    // Start ElegantOTA
+  // ElegantOTA callbacks
+  ElegantOTA.onStart(onOTAStart);
+  ElegantOTA.onProgress(onOTAProgress);
+  ElegantOTA.onEnd(onOTAEnd);
+
+  server.begin();
+
+
+  //begin screen
+  u8g2.begin();
+  u8g2_prepare();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.setFontRefHeightExtendedText();
+  u8g2.setDrawColor(1);
+  u8g2.setFontPosTop();
+  u8g2.setFontDirection(0);
+  pinMode(plus_D, INPUT_PULLUP);
+  pinMode(plus_U, INPUT_PULLUP);
+  pinMode(minus_D, INPUT_PULLUP);
+  pinMode(minus_U, INPUT_PULLUP);
   //create pwm channel and set to pin
   /*ledcSetup(up_pwm_channel, freq, resolution);
   ledcAttachPin(up_pwm, up_pwm_channel);
   ledcWrite(up_pwm, 255);*/
-  bool p1 = ledcAttachChannel(up_pwm, freq, resolution,up_pwm_channel);
+  bool p_u = ledcAttachChannel(up_pwm, freq, resolution,up_pwm_channel);
+  bool p_d = ledcAttachChannel(down_pwm, freq, resolution,down_pwm_channel);
   Serial.print("PWM1 attach channel is ");
-  if (p1){
-    Serial.println("true ");
-    ledcWrite(up_pwm, 0);
+  if (p_u && p_d){
+    Serial.println("PWM CREATED ");
+    ledcWrite(up_pwm,255);
+    ledcWrite(down_pwm,255);
   }else{
-    Serial.println("false");
+    Serial.println("ERROR CREATING PWM");
   }
   //pinMode(up_pwm, OUTPUT);
   
@@ -86,13 +162,8 @@ void setup() {
   
   analogWrite(up_pwm, 255);
   pinMode(down_pwm, OUTPUT);*/
-    //begin screen
-  /*u8g2.begin();
-  u8g2_prepare();*/
-  pinMode(plus_D, INPUT_PULLUP);
-  pinMode(plus_U, INPUT_PULLUP);
-  pinMode(minus_D, INPUT_PULLUP);
-  pinMode(minus_U, INPUT_PULLUP);
+  
+  
   //pinMode(LED_BUILTIN, OUTPUT); // initialize the built-in LED pin to indicate when a central is connected
   //begin temp sensor
   sensore_U.begin();
@@ -128,16 +199,17 @@ void loop() {
 
 void TaskHandler(void* pvParameters) {
   while (1) {
-    /*
+    server.handleClient();
+    ElegantOTA.loop();
+
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_6x10_tf);
     u8g2.setFontRefHeightExtendedText();
     u8g2.setDrawColor(1);
     u8g2.setFontPosTop();
-    u8g2.setFontDirection(0);*/
+    u8g2.setFontDirection(0);
     //temp sensor update
-    sensore_U.requestTemperatures();
-    
+    sensore_U.requestTemperatures();    
     sensore_D.requestTemperatures();
     RU = sensore_U.getTempCByIndex(0);
     RD = sensore_D.getTempCByIndex(0);
@@ -158,7 +230,6 @@ void TaskHandler(void* pvParameters) {
     if (m_D == HIGH) {
       TD = TD - 1;
     }
-    /*
     u8g2.drawStr(10, 0, "DOWN");
     u8g2.setCursor(70, 0);
     u8g2.print("UP");
@@ -171,26 +242,31 @@ void TaskHandler(void* pvParameters) {
     u8g2.setCursor(70, 40);
     u8g2.print(String(RU));
     u8g2.sendBuffer();
-    */
+    
     vTaskDelay(100);
   }
 }
-float cutout = 0.35;
+float cutout = 0.70;
 void TaskTemp(void* pvParameters) {
   while (1) {
     Serial.print("Task2");
     Serial.println(RU);
     if (RU < (int)(cutout * TU)) {
       bool x = ledcWrite(up_pwm, 255);
-    } else {
-      pwm_UP = (int)map(RU, 0, TU, 255, 20  );
+    } else if (RU > (int)(cutout * TU) && RU < TU -10){
+      pwm_UP = (int)map(RU,cutout *TU, TU-10, 255, 20  );
       ledcWrite(up_pwm, pwm_UP);
+    }else{
+      ledcWrite(up_pwm, 20);
     }
+    
     if (RD < (int)(cutout * TD)) {
       ledcWrite(down_pwm, 255);
-    } else {
-      pwm_DOWN = (int)map(RD, 0, TD, 255, 20  );
+    } else if (RD > (int)(cutout * TD) && RD < TD -10){
+      pwm_DOWN = (int)map(RD, cutout *TD, TD-10, 255, 20  );
       ledcWrite(down_pwm, pwm_DOWN);
+    }else{
+      ledcWrite(up_pwm, 20);
     }
 
 
